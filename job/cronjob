@@ -1,0 +1,1 @@
+0 7 * * * . /etc/environment; /dou-api/job/load_inlabs.py >> /var/log/cron.log 2>&1

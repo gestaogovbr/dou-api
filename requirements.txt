@@ -1,0 +1,6 @@
+requests==2.31.0
+beautifulsoup4==4.12.3
+elementpath==4.3.0
+Flask==3.0.2
+gunicorn==21.2.0
+slack-sdk==3.27.1

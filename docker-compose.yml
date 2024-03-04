@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: .
+    container_name: dou-api
+    command: sh -c "python /dou-api/app/api.py"
+    environment:
+      INLABS_EMAIL: ${INLABS_EMAIL}
+      INLABS_PASSWORD: ${INLABS_PASSWORD}
+      SLACK_BOT_URL: ${SLACK_BOT_URL}
+    ports:
+      - "5057:5057"
+    volumes:
+        - ./:/dou-api
