@@ -42,6 +42,7 @@ def query_db(data):
 
     return results
 
+
 def assert_data(var):
     if not isinstance(var, dict):
         return False, "Variable is not a dictionary"
@@ -57,6 +58,7 @@ def assert_data(var):
 
     return True, ""
 
+
 @app.route("/dou", methods=["POST"])
 def get_entries():
     data = request.json
@@ -68,6 +70,7 @@ def get_entries():
     results = query_db(data)
 
     return jsonify(results)
+
 
 @app.route("/", methods=["GET"])
 def get_help():

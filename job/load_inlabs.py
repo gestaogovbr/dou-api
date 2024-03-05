@@ -16,15 +16,15 @@ from slack_sdk import WebhookClient
 # Configura logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 BASE_URL = "https://inlabs.in.gov.br"
 
 CREDENTIALS = {
     "email": os.environ.get("INLABS_EMAIL"),
-    "password": os.environ.get("INLABS_PASSWORD")
+    "password": os.environ.get("INLABS_PASSWORD"),
 }
 DEST_PATH = "/tmp/download_dou"
 DB_PATH = "/dou-api/data"
@@ -32,13 +32,16 @@ SLACK_BOT_URL = os.environ.get("SLACK_BOT_URL")
 
 # 1. Criar diretórios se não existirem
 
+
 def create_directories():
     subprocess.run(f"mkdir -p {DEST_PATH}", shell=True, check=True)
     subprocess.run(f"mkdir -p {DB_PATH}", shell=True, check=True)
 
     logging.info(f"Directories `{DEST_PATH}`, `{DB_PATH}` created.")
 
+
 # 2. Autenticar no inlabs
+
 
 def get_session():
     headers = {
@@ -56,7 +59,9 @@ def get_session():
     else:
         raise ValueError("Auth failed")
 
+
 # 3. Baixar arquivos
+
 
 def download_files(session):
     cookie = session.cookies.get("inlabs_session_cookie")
@@ -86,7 +91,9 @@ def download_files(session):
 
     return files
 
+
 # 4. Descompactar
+
 
 def unzip_files():
     all_files = os.listdir(DEST_PATH)
@@ -99,7 +106,9 @@ def unzip_files():
 
     logging.info(f"Unzipped files: {zip_files}.")
 
+
 # 5. Escrever no banco
+
 
 def init_db(conn):
     cursor = conn.cursor()
@@ -121,7 +130,9 @@ def init_db(conn):
                 texto TEXT)
         """
     )
-    cursor.execute(f"DELETE FROM article WHERE pub_date = '{date.today().strftime('%d/%m/%Y')}'")
+    cursor.execute(
+        f"DELETE FROM article WHERE pub_date = '{date.today().strftime('%d/%m/%Y')}'"
+    )
     conn.commit()
 
 
@@ -179,12 +190,19 @@ def load_xml_files():
         write_xml_to_db(root, conn)
 
     cursor = conn.cursor()
-    cursor.execute(f"SELECT count(*) from article WHERE pub_date = '{date.today().strftime('%d/%m/%Y')}'")
+    cursor.execute(
+        f"SELECT count(*) from article WHERE pub_date = '{date.today().strftime('%d/%m/%Y')}'"
+    )
     row_count = cursor.fetchone()
 
     conn.close()
 
-    logging.info(f"Database `{os.path.join(DB_PATH, 'dou.db')}` updated with {row_count} lines.")
+    logging.info(
+        f"Database `{os.path.join(DB_PATH, 'dou.db')}` updated with {row_count} lines."
+    )
+
+
+# 6. Remover arquivos
 
 
 def remove_files():
@@ -193,23 +211,27 @@ def remove_files():
     logging.info(f"Directory {DEST_PATH} removed.")
 
 
+# 7. Notificar slack conclusão
+
+
 def notify(files):
     webhook = WebhookClient(SLACK_BOT_URL)
-    cleaned_files = ", ".join([item.split('dl=')[-1] for item in files])
+    cleaned_files = ", ".join([item.split("dl=")[-1] for item in files])
 
     response = webhook.send(
         text="Hello from dou-job!",
         blocks=[
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": f"""
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": f"""
                     * :tada: [ref. {date.today().strftime('%Y-%m-%d')}] Dados do DOU atualizados.* \n\n Arquivos: {cleaned_files}
-                """
+                """,
+                },
             }
-        }
-    ])
+        ],
+    )
     assert response.status_code == 200
     assert response.body == "ok"
 
