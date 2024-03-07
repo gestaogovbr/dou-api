@@ -1,3 +1,4 @@
+from datetime import date
 from flask import Flask, request, abort, jsonify
 import sqlite3
 
@@ -9,11 +10,18 @@ def query_db(data):
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
-    sql_query = "SELECT * FROM article"
+    pub_date = data.get("pub_date", [date.today().strftime("%Y-%m-%d")])
+    pub_date_from = pub_date[0]
+    try:
+        pub_date_to = pub_date[1]
+    except IndexError:
+        pub_date_to = pub_date_from
+
+    sql_query = f"SELECT * FROM article WHERE (pub_date BETWEEN '{pub_date_from}' AND '{pub_date_to}')"
+
     allowed_keys = [
         "name",
         "pub_name",
-        "pub_date",
         "art_category",
         "identifica",
         "titulo",
@@ -32,8 +40,8 @@ def query_db(data):
         ]
     )
 
-    if sql_params:
-        sql_query = f"{sql_query} WHERE {sql_params}"
+    if sql_params and "pubdate_from":
+        sql_query = f"{sql_query} AND ({sql_params})"
 
     cur.execute(sql_query)
     rows = cur.fetchall()

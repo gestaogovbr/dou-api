@@ -3,7 +3,7 @@
 import os
 import subprocess
 import logging
-from datetime import date
+from datetime import date, datetime
 import glob
 import zipfile
 import requests
@@ -119,7 +119,7 @@ def init_db(conn):
                 name TEXT,
                 pub_name TEXT,
                 art_type TEXT,
-                pub_date TEXT,
+                pub_date DATE,
                 art_category TEXT,
                 pdf_page TEXT,
                 identifica TEXT,
@@ -131,7 +131,7 @@ def init_db(conn):
         """
     )
     cursor.execute(
-        f"DELETE FROM article WHERE pub_date = '{date.today().strftime('%d/%m/%Y')}'"
+        f"DELETE FROM article WHERE pub_date = '{date.today().strftime('%Y-%m-%d')}'"
     )
     conn.commit()
 
@@ -143,7 +143,9 @@ def write_xml_to_db(root, conn):
         name = article.attrib["name"]
         pub_name = article.attrib["pubName"]
         art_type = article.attrib["artType"]
-        pub_date = article.attrib["pubDate"]
+        # Format the datetime object to 'YYYY-MM-DD' string format
+        date_obj = datetime.strptime(article.attrib["pubDate"], '%d/%m/%Y')
+        pub_date = date_obj.strftime('%Y-%m-%d')
         art_category = article.attrib["artCategory"]
         pdf_page = article.attrib["pdfPage"]
         identifica = article.find("body").find("Identifica").text
@@ -191,7 +193,7 @@ def load_xml_files():
 
     cursor = conn.cursor()
     cursor.execute(
-        f"SELECT count(*) from article WHERE pub_date = '{date.today().strftime('%d/%m/%Y')}'"
+        f"SELECT count(*) from article WHERE pub_date = '{date.today().strftime('%Y-%m-%d')}'"
     )
     row_count = cursor.fetchone()
 
