@@ -2,6 +2,8 @@
 
 import os
 import subprocess
+import argparse
+from argparse import ArgumentTypeError
 import logging
 from datetime import date, datetime
 import glob
@@ -29,6 +31,7 @@ CREDENTIALS = {
 DEST_PATH = "/tmp/download_dou"
 DB_PATH = "/dou-api/data"
 SLACK_BOT_URL = os.environ.get("SLACK_BOT_URL")
+
 
 # 1. Criar diretórios se não existirem
 
@@ -63,13 +66,13 @@ def get_session():
 # 3. Baixar arquivos
 
 
-def download_files(session):
+def download_files(session, execution_date):
     cookie = session.cookies.get("inlabs_session_cookie")
     # 3.1 Descobrir arquivos disponíveis
     headers = {"Cookie": f"inlabs_session_cookie={cookie}", "origem": "736372697074"}
     response = session.request(
         "GET",
-        urljoin(BASE_URL, f"index.php?p={date.today().strftime('%Y-%m-%d')}"),
+        urljoin(BASE_URL, f"index.php?p={execution_date}"),
         headers=headers,
     )
 
@@ -110,7 +113,7 @@ def unzip_files():
 # 5. Escrever no banco
 
 
-def init_db(conn):
+def init_db(conn, execution_date):
     cursor = conn.cursor()
     cursor.execute(
         """
@@ -130,9 +133,7 @@ def init_db(conn):
                 texto TEXT)
         """
     )
-    cursor.execute(
-        f"DELETE FROM article WHERE pub_date = '{date.today().strftime('%Y-%m-%d')}'"
-    )
+    cursor.execute(f"DELETE FROM article WHERE pub_date = '{execution_date}'")
     conn.commit()
 
 
@@ -144,8 +145,8 @@ def write_xml_to_db(root, conn):
         pub_name = article.attrib["pubName"]
         art_type = article.attrib["artType"]
         # Format the datetime object to 'YYYY-MM-DD' string format
-        date_obj = datetime.strptime(article.attrib["pubDate"], '%d/%m/%Y')
-        pub_date = date_obj.strftime('%Y-%m-%d')
+        date_obj = datetime.strptime(article.attrib["pubDate"], "%d/%m/%Y")
+        pub_date = date_obj.strftime("%Y-%m-%d")
         art_category = article.attrib["artCategory"]
         pdf_page = article.attrib["pdfPage"]
         identifica = article.find("body").find("Identifica").text
@@ -179,9 +180,9 @@ def write_xml_to_db(root, conn):
         conn.commit()
 
 
-def load_xml_files():
+def load_xml_files(execution_date):
     conn = sqlite3.connect(os.path.join(DB_PATH, "dou.db"))
-    init_db(conn)
+    init_db(conn, execution_date)
 
     for xml_file in glob.glob(
         os.path.join(DEST_PATH, "extract/**/*.xml"), recursive=True
@@ -192,9 +193,7 @@ def load_xml_files():
         write_xml_to_db(root, conn)
 
     cursor = conn.cursor()
-    cursor.execute(
-        f"SELECT count(*) from article WHERE pub_date = '{date.today().strftime('%Y-%m-%d')}'"
-    )
+    cursor.execute(f"SELECT count(*) from article WHERE pub_date = '{execution_date}'")
     row_count = cursor.fetchone()
 
     conn.close()
@@ -216,7 +215,7 @@ def remove_files():
 # 7. Notificar slack conclusão
 
 
-def notify(files):
+def notify(files, execution_date):
     webhook = WebhookClient(SLACK_BOT_URL)
     cleaned_files = ", ".join([item.split("dl=")[-1] for item in files])
 
@@ -228,7 +227,7 @@ def notify(files):
                 "text": {
                     "type": "mrkdwn",
                     "text": f"""
-                    * :tada: [ref. {date.today().strftime('%Y-%m-%d')}] Dados do DOU atualizados.* \n\n Arquivos: {cleaned_files}
+                    * :tada: [ref. {execution_date}] Dados do DOU atualizados.* \n\n Arquivos: {cleaned_files}
                 """,
                 },
             }
@@ -238,11 +237,33 @@ def notify(files):
     assert response.body == "ok"
 
 
+def valid_date(s):
+    try:
+        s = datetime.strptime(s, "%Y-%m-%d")
+        return s.strftime("%Y-%m-%d")
+    except ValueError:
+        msg = "Not a valid date: '{0}'. Date format should be YYYY-MM-DD.".format(s)
+        raise ArgumentTypeError(msg)
+
+
 if __name__ == "__main__":
+    # Create the parser
+    parser = argparse.ArgumentParser(description="Load INLABs DOU publications.")
+    # Add arguments with custom validation
+    parser.add_argument(
+        "--date",
+        type=valid_date,
+        help="Set date to load DOU in YYYY-MM-DD format (default is today: %(default)s)",
+        default=date.today().strftime("%Y-%m-%d"),
+    )
+    # Parse arguments
+    args = parser.parse_args()
+    execution_date = args.date
+
     create_directories()
     session = get_session()
-    files = download_files(session)
+    files = download_files(session, execution_date)
     unzip_files()
-    load_xml_files()
+    load_xml_files(execution_date)
     remove_files()
-    notify(files)
+    notify(files, execution_date)

@@ -67,6 +67,8 @@ spec:
                   key: SLACK_BOT_URL
             - name: FLASK_ENV
               value: production
+            - name: DOU_API_REQUEST_CHUNKSIZE
+              value: 40
           volumeMounts:
             - name: dou-db
               mountPath: /dou-api/data

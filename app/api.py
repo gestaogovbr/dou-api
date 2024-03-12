@@ -1,12 +1,19 @@
 from datetime import date
+import unicodedata
 from flask import Flask, request, abort, jsonify
 import sqlite3
 
 app = Flask(__name__)
 
 
+def normalize(text):
+    normalized = unicodedata.normalize("NFKD", text)
+    return normalized.encode("ascii", "ignore").decode("ascii")
+
+
 def query_db(data):
     conn = sqlite3.connect("/dou-api/data/dou.db")
+    conn.create_function("normalize", 1, normalize)
     conn.row_factory = sqlite3.Row
     cur = conn.cursor()
 
@@ -29,19 +36,24 @@ def query_db(data):
         "texto",
     ]
 
-    filtered_data = {key: data[key] for key in data if key in allowed_keys}
+    filtered_data = {key: [normalize(v) for v in data[key]] for key in data if key in allowed_keys}
 
     sql_params = " AND ".join(
         [
-            f"({key} LIKE '%{value[0]}%'"
-            + "".join([f" OR {key} LIKE '%{v}%'" for v in value[1:]])
+            f"(normalize({key}) LIKE '%{value[0]}%'"
+            + "".join(
+                [
+                    f" OR normalize({key}) LIKE '%{v}%'"
+                    for v in value[1:]
+                ]
+            )
             + ")"
             for key, value in filtered_data.items()
         ]
     )
 
-    if sql_params and "pubdate_from":
-        sql_query = f"{sql_query} AND ({sql_params})"
+    if sql_params:
+        sql_query = f"{sql_query} AND {sql_params}"
 
     cur.execute(sql_query)
     rows = cur.fetchall()
