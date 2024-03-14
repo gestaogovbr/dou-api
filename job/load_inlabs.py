@@ -130,11 +130,19 @@ def init_db(conn, execution_date):
                 ementa TEXT,
                 titulo TEXT,
                 sub_titulo TEXT,
-                texto TEXT)
+                texto TEXT,
+                assina TEXT)
         """
     )
     cursor.execute(f"DELETE FROM article WHERE pub_date = '{execution_date}'")
     conn.commit()
+
+
+def _get_assina(text):
+    soup = BeautifulSoup(text, "html.parser")
+    p_tag = soup.find("p", class_="assina")
+
+    return p_tag.text if p_tag else None
 
 
 def write_xml_to_db(root, conn):
@@ -155,10 +163,11 @@ def write_xml_to_db(root, conn):
         titulo = article.find("body").find("Titulo").text
         sub_titulo = article.find("body").find("SubTitulo").text
         texto = article.find("body").find("Texto").text
+        assina = _get_assina(texto)
 
         cursor.execute(
             """
-                INSERT INTO article (article_id,name,pub_name,art_type,pub_date,art_category,pdf_page,identifica,data,ementa,titulo,sub_titulo,texto) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO article (article_id,name,pub_name,art_type,pub_date,art_category,pdf_page,identifica,data,ementa,titulo,sub_titulo,texto,assina) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 article_id,
@@ -174,6 +183,7 @@ def write_xml_to_db(root, conn):
                 titulo,
                 sub_titulo,
                 texto,
+                assina,
             ),
         )
 
